@@ -7,30 +7,24 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Search, Plus, Database, Trees as Tree, Loader2, Trash2, Info, HardDrive } from 'lucide-react';
+import { Search, Plus, Database, Trees as Tree, Loader2 } from 'lucide-react';
 import TreeVisualization from '@/components/TreeVisualization';
 
 export default function Home() {
   const [insertKey, setInsertKey] = useState('');
   const [insertValue, setInsertValue] = useState('');
   const [searchKey, setSearchKey] = useState('');
-  type SearchResult = { found: boolean; key?: string | number; value?: string; message?: string };
+  type SearchResult = { found: boolean; key: string; value?: string; message?: string };
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   type DataItem = { key: string | number; value: string };
   const [allData, setAllData] = useState<DataItem[]>([]);
   const [treeData, setTreeData] = useState(null);
-  type StorageInfo = {
-    itemCount: number;
-    storageSize: number;
-    hasStoredData: boolean;
-  };
-  const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'info' | 'success' | 'error' | 'warning' } | null>(null);
 
   const showMessage = (text: string, type: 'info' | 'success' | 'error' | 'warning' = 'info') => {
     setMessage({ text, type });
-    setTimeout(() => setMessage(null), 4000);
+    setTimeout(() => setMessage(null), 3000);
   };
 
   const handleInsert = async () => {
@@ -41,7 +35,7 @@ export default function Home() {
 
     setIsLoading(true);
     try {
-      const key = isNaN(Number(insertKey)) ? insertKey : Number(insertKey);
+      const key = Number.isNaN(Number(insertKey)) ? insertKey : Number(insertKey);
       const response = await fetch('/api/insert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -50,10 +44,11 @@ export default function Home() {
 
       const result = await response.json();
       if (response.ok) {
-        showMessage(`Successfully inserted: ${key} → ${insertValue}`, 'success');
+        showMessage(`Successfully inserted: ${key} -> ${insertValue}`, 'success');
         setInsertKey('');
         setInsertValue('');
-        await refreshAllData();
+        await refreshTreeData();
+        await fetchAllData();
       } else {
         showMessage(result.error, 'error');
       }
@@ -79,7 +74,7 @@ export default function Home() {
       if (response.ok) {
         setSearchResult(result);
         if (result.found) {
-          showMessage(`Found: ${result.key} → ${result.value}`, 'success');
+          showMessage(`Found: ${result.key} -> ${result.value}`, 'success');
         } else {
           showMessage(`Key "${result.key}" not found`, 'warning');
         }
@@ -88,32 +83,6 @@ export default function Home() {
       }
     } catch (error) {
       showMessage('Failed to search', 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleClearAll = async () => {
-    if (!confirm('Are you sure you want to clear all data? This action cannot be undone.')) {
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const response = await fetch('/api/clear', {
-        method: 'DELETE',
-      });
-
-      const result = await response.json();
-      if (response.ok) {
-        showMessage('All data cleared successfully', 'success');
-        setSearchResult(null);
-        await refreshAllData();
-      } else {
-        showMessage(result.error, 'error');
-      }
-    } catch (error) {
-      showMessage('Failed to clear data', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -143,37 +112,10 @@ export default function Home() {
     }
   };
 
-  const fetchStorageInfo = async () => {
-    try {
-      const response = await fetch('/api/storage-info');
-      const result = await response.json();
-      if (response.ok) {
-        setStorageInfo(result.storageInfo);
-      }
-    } catch (error) {
-      console.error('Failed to fetch storage info:', error);
-    }
-  };
-
-  const refreshAllData = async () => {
-    await Promise.all([
-      fetchAllData(),
-      refreshTreeData(),
-      fetchStorageInfo()
-    ]);
-  };
-
   useEffect(() => {
-    refreshAllData();
+    fetchAllData();
+    refreshTreeData();
   }, []);
-
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
@@ -183,29 +125,10 @@ export default function Home() {
           <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
             B+ Tree Data Structure
           </h1>
-          <p className="text-gray-600 text-lg max-w-2xl mx-auto mb-4">
-            Interactive B+ Tree implementation with real-time visualization and localStorage persistence. 
-            Insert key-value pairs, search for data, and watch the tree structure grow dynamically.
+          <p className="text-gray-600 text-lg max-w-2xl mx-auto">
+            Interactive B+ Tree implementation with real-time visualization. Insert key-value pairs, 
+            search for data, and watch the tree structure grow dynamically.
           </p>
-          
-          {/* Storage Info */}
-          {storageInfo && (
-            <div className="flex items-center justify-center gap-4 text-sm text-gray-500">
-              <div className="flex items-center gap-1">
-                <HardDrive className="w-4 h-4" />
-                <span>Stored: {storageInfo.itemCount} items</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Database className="w-4 h-4" />
-                <span>Size: {formatBytes(storageInfo.storageSize)}</span>
-              </div>
-              {storageInfo.hasStoredData && (
-                <Badge variant="secondary" className="text-xs">
-                  Data persisted in localStorage
-                </Badge>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Message Display */}
@@ -240,7 +163,6 @@ export default function Home() {
                     onChange={(e) => setInsertKey(e.target.value)}
                     placeholder="Enter key"
                     className="mt-1"
-                    onKeyPress={(e) => e.key === 'Enter' && handleInsert()}
                   />
                 </div>
                 <div>
@@ -251,7 +173,6 @@ export default function Home() {
                     onChange={(e) => setInsertValue(e.target.value)}
                     placeholder="Enter value"
                     className="mt-1"
-                    onKeyPress={(e) => e.key === 'Enter' && handleInsert()}
                   />
                 </div>
               </div>
@@ -283,7 +204,6 @@ export default function Home() {
                   onChange={(e) => setSearchKey(e.target.value)}
                   placeholder="Enter key to search"
                   className="mt-1"
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                 />
               </div>
               <Button 
@@ -334,36 +254,21 @@ export default function Home() {
                 <Database className="w-5 h-5 text-indigo-600" />
                 All Data
               </CardTitle>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="text-sm">
-                  {allData.length} items
-                </Badge>
-                {allData.length > 0 && (
-                  <Button
-                    onClick={handleClearAll}
-                    disabled={isLoading}
-                    variant="destructive"
-                    size="sm"
-                    className="text-xs"
-                  >
-                    {isLoading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Trash2 className="w-3 h-3 mr-1" />}
-                    Clear All
-                  </Button>
-                )}
-              </div>
+              <Badge variant="secondary" className="text-sm">
+                {allData.length} items
+              </Badge>
             </div>
           </CardHeader>
           <CardContent>
             {allData.length === 0 ? (
               <div className="text-center py-8">
                 <Database className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500 mb-2">No data stored yet. Insert some key-value pairs to get started!</p>
-                <p className="text-sm text-gray-400">Data will be automatically saved to localStorage and persist across page refreshes.</p>
+                <p className="text-gray-500">No data stored yet. Insert some key-value pairs to get started!</p>
               </div>
             ) : (
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {allData.map((item, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border hover:bg-gray-100 transition-colors">
+                  <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
                     <div className="flex items-center gap-4">
                       <Badge variant="outline" className="font-mono">
                         {item.key}
@@ -380,14 +285,8 @@ export default function Home() {
 
         {/* Footer */}
         <div className="text-center mt-12 pt-8 border-t border-gray-200">
-          <div className="flex items-center justify-center gap-2 mb-2">
-            <Info className="w-4 h-4 text-gray-400" />
-            <p className="text-gray-500">
-              B+ Tree implementation with order 3. Data is automatically saved to localStorage.
-            </p>
-          </div>
-          <p className="text-sm text-gray-400">
-            Data persists across page refreshes but will be cleared when localStorage is manually cleared or when browsing in incognito mode.
+          <p className="text-gray-500">
+            B+ Tree implementation with order 3. All data is stored in memory and will be lost on page refresh.
           </p>
         </div>
       </div>
