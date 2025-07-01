@@ -14,13 +14,14 @@ export default function Home() {
   const [insertKey, setInsertKey] = useState('');
   const [insertValue, setInsertValue] = useState('');
   const [searchKey, setSearchKey] = useState('');
-  type SearchResult = { found: boolean; key: string; value?: string; message?: string };
+  type SearchResult = { found: boolean; key?: string | number; value?: string; message?: string };
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   type DataItem = { key: string | number; value: string };
   const [allData, setAllData] = useState<DataItem[]>([]);
   const [treeData, setTreeData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState<{ text: string; type: 'info' | 'success' | 'error' | 'warning' } | null>(null);
+  type MessageType = { text: string; type: 'info' | 'success' | 'error' | 'warning' } | null;
+  const [message, setMessage] = useState<MessageType>(null);
 
   const showMessage = (text: string, type: 'info' | 'success' | 'error' | 'warning' = 'info') => {
     setMessage({ text, type });
@@ -35,7 +36,7 @@ export default function Home() {
 
     setIsLoading(true);
     try {
-      const key = Number.isNaN(Number(insertKey)) ? insertKey : Number(insertKey);
+      const key = isNaN(Number(insertKey)) ? insertKey : Number(insertKey);
       const response = await fetch('/api/insert', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
